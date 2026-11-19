@@ -4,30 +4,90 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Target: IPM Elsevier](https://img.shields.io/badge/Target-Information%20Processing%20%26%20Management-brightgreen.svg)](https://www.sciencedirect.com/journal/information-processing-and-management)
 
-This repository contains the official implementation, replication notebooks, and experimental evaluation for the manuscript:
+This repository provides the official implementation, replication pipelines, and evaluation benchmarks for the research manuscript:
 
 > **"How Many Humans Does a Decision Need? Legitimacy-Aware Jury Allocation and Conformal Overrule Guarantees for Content Moderation"**  
-> **Authors:** Shixiang Yu$^1$, Muhammad Khubaib Ahmad$^{2,3,*}$  
-> *School of Computing, National University of Singapore; Emerson University Multan; INFERENCE Lab*  
+> **Authors:** Shixiang Yu<sup>1</sup>, Muhammad Khubaib Ahmad<sup>2,3,*</sup>  
+> *<sup>1</sup>School of Computing, National University of Singapore; <sup>2</sup>Department of Computer Science, Emerson University Multan; <sup>3</sup>INFERENCE Lab*  
 > **Track:** *Critical Application Manuscript* (System Design Research in Social Computing)  
-> **Target Venue:** *Information Processing & Management* (Elsevier, Impact Factor: **8.6**, Q1 SCIE/SSCI)
+> **Target Venue:** *Information Processing & Management* (Elsevier, Impact Factor: **8.6**, Q1 SCIE/SSCI, CAS Tier 1)  
+> **Correspondence:** `khubaib@eum.edu.pk`
 
 ---
 
-## 📌 Overview
+## 📌 Problem Formulation and Method Overview
 
-Modern content moderation systems face a fundamental socio-technical crisis: scalable AI classifiers must regulate online speech, yet toxic language and hate speech are inherently subjective and culturally situated. Conventional "learning-to-defer" paradigms operate under a flawed binary assumption: routing each post either entirely to machine autonomy or to a single human reviewer, while treating inter-annotator disagreement as label noise. Consequently, autonomous systems disproportionately overrule vulnerable demographic minorities, while single-human review fails to resolve contested interpretations.
+Modern content moderation systems face a fundamental socio-technical crisis: scalable artificial intelligence classifiers must regulate online speech, yet toxic language and hate speech are inherently subjective and culturally situated. Conventional human-in-the-loop and learning-to-defer frameworks operate under a flawed binary assumption: routing each post either entirely to machine autonomy or to a single human reviewer, while treating inter-annotator disagreement as label noise. Consequently, autonomous systems disproportionately overrule vulnerable demographic minorities, while single-human review fails to resolve contentious interpretations.
 
-To solve this, we propose **Legitimacy-Aware Jury Allocation (LAJ)**:
-1. **Condorcet Simplex Panel Value ($f_k(p)$):** Closed-form generalization of the Condorcet Jury Theorem over the multi-class probability simplex $\Delta^{K-1}$, quantifying the exact expected agreement between a $k$-person human jury and the broader annotator community.
-2. **Second-Order Perspectivist Modeling:** Uses a bootstrap soft-label ensemble to decouple epistemic model uncertainty from aleatoric societal contestation.
-3. **Dynamic Panel Sizing ($k^*(x)$):** Resolves *"How many humans does a decision need?"* by dynamically allocating variable panel sizes $k \in \{0, 1, \dots, M-1\}$ based on marginal legitimacy gain per review cost $\mu$.
-4. **Distribution-Free Conformal Safety Certification:** Uses Conformal Risk Control (CRC) to mathematically guarantee that the Autonomous Overrule Rate satisfies $\mathbb{E}[\text{AOR}] \le \alpha$ with finite-sample validity under exchangeability.
-5. **Non-Circular Held-out Annotator Agreement (HAA):** Scores panel decisions strictly against independent held-out annotators not serving on the panel across 4 multi-annotator corpora (**HateXplain**, **MD-Agreement**, **HS-Brexit**, and **ArMIS**).
+```
++----------------------------------------------------------------------------------------------------+
+|                                 LEGITIMACY-AWARE JURY ALLOCATION (LAJ)                             |
++----------------------------------------------------------------------------------------------------+
+|                                                                                                    |
+|      [ Incoming Post x ]                                                                           |
+|               │                                                                                    |
+|               ▼                                                                                    |
+|  ┌─────────────────────────┐                                                                       |
+|  │ Second-Order Bootstrap  │ ──► Epistemic Model Uncertainty Var[p]                                |
+|  │   Soft-Label Ensemble   │ ──► Aleatoric Human Disagreement H(p)                                 |
+|  └────────────┬────────────┘                                                                       |
+|               │                                                                                    |
+|               ▼                                                                                    |
+|  ┌─────────────────────────┐     k*(x) = argmax [ V_k(x) - μ · k ]                                 |
+|  │ Condorcet Simplex Panel │ ──────────────────────────────────────────┐                           |
+|  │   Value Engine f_k(p)   │                                           │                           |
+|  └─────────────────────────┘                                           ▼                           |
+|                                                     ┌────────────────────────────────────┐         |
+|                                                     │ Adaptive Sizing Routing Decision   │         |
+|                                                     │      k*(x) ∈ {0, 1, ..., M-1}      │         |
+|                                                     └──────────────────┬─────────────────┘         |
+|                                                                        │                           |
+|                    ┌───────────────────────────────────────────────────┴─────────────┐             |
+|                    ▼                                                                 ▼             |
+|         [ Case 1: k*(x) = 0 ]                                             [ Case 2: k*(x) ≥ 1 ]     |
+|         AUTONOMOUS MACHINE ACTION                                         DELIBERATIVE HUMAN JURY  |
+|                    │                                                                 │             |
+|                    ▼                                                                 ▼             |
+|      ┌───────────────────────────┐                                       ┌───────────────────────┐ |
+|      │ Distribution-Free CRC     │                                       │ Plurality Jury Panel  │ |
+|      │ Certified Safety Gate     │                                       │ with Held-Out Audit   │ |
+|      │   E[ Overrule ] ≤ α       │                                       │   Size k* Annotators  │ |
+|      └───────────────────────────┘                                       └───────────────────────┘ |
++----------------------------------------------------------------------------------------------------+
+```
+
+### Core Methodological Contributions
+
+1. **Condorcet Simplex Panel Value (<i>f<sub>k</sub></i>(<i>p</i>)):**  
+   We extend the classical Condorcet Jury Theorem to the multi-class probability simplex &Delta;<sup><i>K</i>&minus;1</sup>, deriving the exact closed-form expected agreement between a <i>k</i>-person plurality jury and an independent annotator:
+
+```math
+f_k(p) = \sum_{c \in \mathcal{C}(k, K)} \left( \frac{k!}{\prod_{y=0}^{K-1} c_y!} \prod_{y=0}^{K-1} p_y^{c_y} \right) \left( \sum_{y=0}^{K-1} d_y(c) \, p_y \right)
+```
+
+2. **Second-Order Perspectivist Modeling:**  
+   A bootstrap ensemble of <i>B</i> = 8 soft-label estimators captures posterior probability vectors <i>p</i><sup>(<i>b</i>)</sup>(<i>x</i>), disentangling epistemic classifier uncertainty from aleatoric societal contestation.
+
+3. **Dynamic Budget-Constrained Panel Sizing (<i>k</i><sup>*</sup>(<i>x</i>)):**  
+   Resolves *"How many humans does a decision need?"* by allocating variable panel sizes <i>k</i><sup>*</sup>(<i>x</i>) &in; {0, 1, ..., <i>M</i>&minus;1} via shadow labor pricing &mu;, guaranteeing exact Pareto optimality between operational expenditure and community legitimacy:
+
+```math
+k^*(x; \mu) = \arg\max_{k \in \{0, 1, \dots, M-1\}} \left[ V_k(x) - \mu \cdot k \right]
+```
+
+4. **Distribution-Free Conformal Safety Certification:**  
+   For autonomous executions (<i>k</i> = 0), Conformal Risk Control (CRC) guarantees that the Autonomous Overrule Rate (AOR) is bounded below a user-specified safety threshold &alpha; with finite-sample validity under exchangeability:
+
+```math
+\mathbb{E}\left[ \ell_{\text{overrule}}(X) \cdot \mathbf{1}(V_0(X) \ge \hat{\tau}_\alpha) \right] \le \alpha
+```
+
+5. **Non-Circular Held-out Annotator Agreement (HAA):**  
+   Evaluates panel decisions strictly against independent held-out annotators who were not part of the adjudicating panel, completely avoiding circular majority-voting evaluation bias.
 
 ---
 
-## 📂 Repository Structure
+## 📂 Repository Organization
 
 ```
 .
@@ -61,9 +121,9 @@ To solve this, we propose **Legitimacy-Aware Jury Allocation (LAJ)**:
 
 ---
 
-## 🚀 Quick Start & Installation
+## 🚀 Quick Start and Installation
 
-### 1. Local Environment Setup
+### 1. Environment Setup
 ```bash
 # Clone the repository
 git clone https://github.com/Inference-LAB/legitimacy-aware-juriesk.git
@@ -77,20 +137,20 @@ source venv/bin/activate  # On Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Run the Full Experimental Suite
+### 2. Run the Complete Experimental Suite
 ```bash
 python code/run_ipm_v2_study.py
 ```
-*Datasets are automatically streamed and parsed directly from official research repositories on the first run.*
+*Datasets are automatically downloaded and parsed directly from official research repositories on the first execution.*
 
 ### 3. Interactive Replication in Google Colab
 Open [`IPM_v2_Replication_Notebook.ipynb`](IPM_v2_Replication_Notebook.ipynb) in Google Colab with GPU acceleration enabled (`Runtime -> Change runtime type -> T4 / A100 GPU`). Run all cells to reproduce all 6 empirical tables and 2 publication figures in one click.
 
 ---
 
-## 📊 Benchmark Datasets Analyzed
+## 📊 Benchmark Datasets
 
-| Benchmark | Domain & Task | Classes ($K$) | Annotators ($M$) | Samples (Train / Val / Test) | Disagreement Characterization |
+| Benchmark | Domain & Task | Classes (<i>K</i>) | Annotators (<i>M</i>) | Train / Val / Test Splits | Disagreement Characterization |
 | :--- | :--- | :---: | :---: | :---: | :--- |
 | **HateXplain** | Hate & Offensive Speech | 3 | 3 | 15,383 / 1,922 / 1,924 | Multi-target annotations across Twitter and Gab |
 | **MD-Agreement** | Online Toxicity | 2 | 5 | 6,592 / 1,104 / 3,057 | High-variance multi-annotator crowdsourced tweets |
@@ -101,10 +161,21 @@ Open [`IPM_v2_Replication_Notebook.ipynb`](IPM_v2_Replication_Notebook.ipynb) in
 
 ## 🔬 Key Empirical Findings
 
-1. **The Multi-Person Deliberation Dividend:** On MD-Agreement ($M=5$), increasing panel size from $k=1$ (single reviewer) to $k=3$ (three-person jury) increases held-out agreement from 0.7131 to **0.7445** (+3.14% absolute gain).
-2. **Pareto Dominance:** LAJ systematically out-deliberates conventional Maximum Softmax Probability (MSP), disagreement-entropy routing, and fixed 3-tier heuristics, achieving statistically significant improvements ($p < 0.05$ under Holm-Bonferroni correction).
-3. **Sociodemographic Disparity Mitigation:** Under matched review budgets, LAJ reduces the autonomous overrule rate of targeted minorities (Muslim immigrants on HS-Brexit and female annotators on ArMIS) by **42.8% to 73.9%**.
-4. **Distribution-Free Safety Guarantees:** Conformal Risk Control mathematically bounds the Autonomous Overrule Rate below user-specified safety thresholds ($\mathbb{E}[\text{AOR}] \le \alpha$) with high operational throughput.
+### 1. The Multi-Person Deliberation Dividend (Table 1)
+* On **MD-Agreement** (<i>M</i> = 5), expanding panel size from a single reviewer (<i>k</i> = 1) to a three-person jury (<i>k</i> = 3) increases held-out annotator agreement from 0.7131 to **0.7445** (+3.14% absolute gain).
+* On contested items, single-human agreement drops to chance levels (0.333 on HateXplain and ArMIS), proving that lone reviewers cannot legitimately arbitrate contested content without jury deliberation.
+
+### 2. Pareto Dominance across Operational Budgets (Tables 2 & 3)
+* Standard Maximum Softmax Probability (MSP) plateaus once uncertain items receive a single reviewer (budget &approx; 0.6). MSP cannot deploy multi-human juries even when review budget is available.
+* At budget &le; 1.0 reviews/post, LAJ achieves uniform Pareto dominance across all four benchmarks.
+* Paired bootstrap hypothesis tests (<i>B</i> = 2,000 resamples) confirm that legitimacy gains are statistically significant (<i>p</i> &lt; 0.05 under Holm-Bonferroni correction).
+
+### 3. Sociodemographic Equity and Minority Protection (Table 5 & Figure 2)
+* On **HS-Brexit**, conventional MSP autonomously overrules targeted Muslim immigrant annotators on 4.56% of posts. LAJ slashes this overrule rate to **1.19%** under matched budget (**73.9% relative reduction**).
+* On **ArMIS**, LAJ cuts the autonomous overrule rate of female annotators from 15.17% to **8.28%**.
+
+### 4. Certified Autonomous Safety (Table 6)
+* Conformal Risk Control mathematically bounds the Autonomous Overrule Rate below target thresholds (&alpha; = 0.05, 0.10, 0.15, 0.20) while preserving operational throughput (safely resolving 52.7% of MD-Agreement and 89.9% of HS-Brexit autonomously at &alpha; = 0.10).
 
 ---
 
