@@ -40,4 +40,4 @@ The authors declare that they have no known competing financial interests or per
 - **Muhammad Khubaib Ahmad:** Conceptualization, Methodology, Supervision, Project Administration, Formal Analysis, Writing – Review & Editing, Funding Acquisition.
 
 ### Data and Code Availability
-All four multi-annotator corpora (HateXplain, MD-Agreement, HS-Brexit, ArMIS) are publicly accessible benchmark datasets. Full Python implementation source code, second-order ensemble models, evaluation scripts, and replication notebooks are preserved in the project repository.
+All four multi-annotator corpora (HateXplain, MD-Agreement, HS-Brexit, ArMIS) are publicly accessible benchmark datasets. Full Python implementation source code, second-order ensemble models, evaluation scripts, and replication notebooks are openly accessible in the project repository at https://github.com/Inference-LAB/legitimacy-aware-juriesk.

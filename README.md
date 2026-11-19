@@ -66,8 +66,8 @@ To solve this, we propose **Legitimacy-Aware Jury Allocation (LAJ)**:
 ### 1. Local Environment Setup
 ```bash
 # Clone the repository
-git clone https://github.com/Khubaib-Ahmad/legitimacy-aware-juries.git
-cd legitimacy-aware-juries
+git clone https://github.com/Inference-LAB/legitimacy-aware-juriesk.git
+cd legitimacy-aware-juriesk
 
 # Create and activate virtual environment
 python -m venv venv
