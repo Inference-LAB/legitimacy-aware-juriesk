@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+data/raw/*.json
+*.log
+test_math*.docx
+test_inline*.docx
+.vscode/
+.DS_Store
