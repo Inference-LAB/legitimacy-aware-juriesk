@@ -7,8 +7,8 @@
 This repository provides the official implementation, replication pipelines, and evaluation benchmarks for the research manuscript:
 
 > **"How Many Humans Does a Decision Need? Legitimacy-Aware Jury Allocation and Conformal Overrule Guarantees for Content Moderation"**  
-> **Authors:** Shixiang Yu<sup>1</sup>, Muhammad Khubaib Ahmad<sup>2,3,*</sup>  
-> *<sup>1</sup>School of Computing, National University of Singapore; <sup>2</sup>Department of Computer Science, Emerson University Multan; <sup>3</sup>INFERENCE Lab*  
+> **Authors:** Shixiang Yu$^1$, Muhammad Khubaib Ahmad$^{2,3,*}$  
+> *$^1$School of Computing, National University of Singapore; $^2$Department of Computer Science, Emerson University Multan; $^3$INFERENCE Lab*  
 > **Track:** *Critical Application Manuscript* (System Design Research in Social Computing)  
 > **Target Venue:** *Information Processing & Management* (Elsevier, Impact Factor: **8.6**, Q1 SCIE/SSCI, CAS Tier 1)  
 > **Correspondence:** `khubaib@eum.edu.pk`
@@ -58,29 +58,23 @@ Modern content moderation systems face a fundamental socio-technical crisis: sca
 
 ### Core Methodological Contributions
 
-1. **Condorcet Simplex Panel Value (<i>f<sub>k</sub></i>(<i>p</i>)):**  
-   We extend the classical Condorcet Jury Theorem to the multi-class probability simplex &Delta;<sup><i>K</i>&minus;1</sup>, deriving the exact closed-form expected agreement between a <i>k</i>-person plurality jury and an independent annotator:
+1. **Condorcet Simplex Panel Value ($f_k(p)$):**  
+   We extend the classical Condorcet Jury Theorem to the multi-class probability simplex $\Delta^{K-1}$, deriving the exact closed-form expected agreement between a $k$-person plurality jury and an independent annotator:
 
-```math
-f_k(p) = \sum_{c \in \mathcal{C}(k, K)} \left( \frac{k!}{\prod_{y=0}^{K-1} c_y!} \prod_{y=0}^{K-1} p_y^{c_y} \right) \left( \sum_{y=0}^{K-1} d_y(c) \, p_y \right)
-```
+$$f_k(p) = \sum_{c \in \mathcal{C}(k, K)} \left( rac{k!}{\prod_{y=0}^{K-1} c_y!} \prod_{y=0}^{K-1} p_y^{c_y} ight) \left( \sum_{y=0}^{K-1} d_y(c) \, p_y ight)$$
 
 2. **Second-Order Perspectivist Modeling:**  
-   A bootstrap ensemble of <i>B</i> = 8 soft-label estimators captures posterior probability vectors <i>p</i><sup>(<i>b</i>)</sup>(<i>x</i>), disentangling epistemic classifier uncertainty from aleatoric societal contestation.
+   A bootstrap ensemble of $B = 8$ soft-label estimators captures posterior probability vectors $p^{(b)}(x)$, disentangling epistemic classifier uncertainty from aleatoric societal contestation.
 
-3. **Dynamic Budget-Constrained Panel Sizing (<i>k</i><sup>*</sup>(<i>x</i>)):**  
-   Resolves *"How many humans does a decision need?"* by allocating variable panel sizes <i>k</i><sup>*</sup>(<i>x</i>) &in; {0, 1, ..., <i>M</i>&minus;1} via shadow labor pricing &mu;, guaranteeing exact Pareto optimality between operational expenditure and community legitimacy:
+3. **Dynamic Budget-Constrained Panel Sizing ($k^*(x)$):**  
+   Resolves *"How many humans does a decision need?"* by allocating variable panel sizes $k^*(x) \in \{0, 1, \dots, M-1\}$ via shadow labor pricing $\mu$, guaranteeing exact Pareto optimality between operational expenditure and community legitimacy:
 
-```math
-k^*(x; \mu) = \arg\max_{k \in \{0, 1, \dots, M-1\}} \left[ V_k(x) - \mu \cdot k \right]
-```
+$$k^*(x; \mu) = rg\max_{k \in \{0, 1, \dots, M-1\}} \left[ V_k(x) - \mu \cdot k ight]$$
 
 4. **Distribution-Free Conformal Safety Certification:**  
-   For autonomous executions (<i>k</i> = 0), Conformal Risk Control (CRC) guarantees that the Autonomous Overrule Rate (AOR) is bounded below a user-specified safety threshold &alpha; with finite-sample validity under exchangeability:
+   For autonomous executions ($k = 0$), Conformal Risk Control (CRC) guarantees that the Autonomous Overrule Rate (AOR) is bounded below a user-specified safety threshold $lpha$ with finite-sample validity under exchangeability:
 
-```math
-\mathbb{E}\left[ \ell_{\text{overrule}}(X) \cdot \mathbf{1}(V_0(X) \ge \hat{\tau}_\alpha) \right] \le \alpha
-```
+$$\mathbb{E}\left[ \ell_{	ext{overrule}}(X) \cdot \mathbf{1}(V_0(X) \ge \hat{	au}_lpha) ight] \le lpha$$
 
 5. **Non-Circular Held-out Annotator Agreement (HAA):**  
    Evaluates panel decisions strictly against independent held-out annotators who were not part of the adjudicating panel, completely avoiding circular majority-voting evaluation bias.
@@ -150,7 +144,7 @@ Open [`IPM_v2_Replication_Notebook.ipynb`](IPM_v2_Replication_Notebook.ipynb) in
 
 ## 📊 Benchmark Datasets
 
-| Benchmark | Domain & Task | Classes (<i>K</i>) | Annotators (<i>M</i>) | Train / Val / Test Splits | Disagreement Characterization |
+| Benchmark | Domain & Task | Classes ($K$) | Annotators ($M$) | Train / Val / Test Splits | Disagreement Characterization |
 | :--- | :--- | :---: | :---: | :---: | :--- |
 | **HateXplain** | Hate & Offensive Speech | 3 | 3 | 15,383 / 1,922 / 1,924 | Multi-target annotations across Twitter and Gab |
 | **MD-Agreement** | Online Toxicity | 2 | 5 | 6,592 / 1,104 / 3,057 | High-variance multi-annotator crowdsourced tweets |
@@ -162,20 +156,20 @@ Open [`IPM_v2_Replication_Notebook.ipynb`](IPM_v2_Replication_Notebook.ipynb) in
 ## 🔬 Key Empirical Findings
 
 ### 1. The Multi-Person Deliberation Dividend (Table 1)
-* On **MD-Agreement** (<i>M</i> = 5), expanding panel size from a single reviewer (<i>k</i> = 1) to a three-person jury (<i>k</i> = 3) increases held-out annotator agreement from 0.7131 to **0.7445** (+3.14% absolute gain).
+* On **MD-Agreement** ($M = 5$), expanding panel size from a single reviewer ($k = 1$) to a three-person jury ($k = 3$) increases held-out annotator agreement from 0.7131 to **0.7445** (+3.14% absolute gain).
 * On contested items, single-human agreement drops to chance levels (0.333 on HateXplain and ArMIS), proving that lone reviewers cannot legitimately arbitrate contested content without jury deliberation.
 
 ### 2. Pareto Dominance across Operational Budgets (Tables 2 & 3)
-* Standard Maximum Softmax Probability (MSP) plateaus once uncertain items receive a single reviewer (budget &approx; 0.6). MSP cannot deploy multi-human juries even when review budget is available.
-* At budget &le; 1.0 reviews/post, LAJ achieves uniform Pareto dominance across all four benchmarks.
-* Paired bootstrap hypothesis tests (<i>B</i> = 2,000 resamples) confirm that legitimacy gains are statistically significant (<i>p</i> &lt; 0.05 under Holm-Bonferroni correction).
+* Standard Maximum Softmax Probability (MSP) plateaus once uncertain items receive a single reviewer (budget $pprox 0.6$). MSP cannot deploy multi-human juries even when review budget is available.
+* At budget $\le 1.0$ reviews/post, LAJ achieves uniform Pareto dominance across all four benchmarks.
+* Paired bootstrap hypothesis tests ($B = 2,000$ resamples) confirm that legitimacy gains are statistically significant ($p < 0.05$ under Holm-Bonferroni correction).
 
 ### 3. Sociodemographic Equity and Minority Protection (Table 5 & Figure 2)
 * On **HS-Brexit**, conventional MSP autonomously overrules targeted Muslim immigrant annotators on 4.56% of posts. LAJ slashes this overrule rate to **1.19%** under matched budget (**73.9% relative reduction**).
 * On **ArMIS**, LAJ cuts the autonomous overrule rate of female annotators from 15.17% to **8.28%**.
 
 ### 4. Certified Autonomous Safety (Table 6)
-* Conformal Risk Control mathematically bounds the Autonomous Overrule Rate below target thresholds (&alpha; = 0.05, 0.10, 0.15, 0.20) while preserving operational throughput (safely resolving 52.7% of MD-Agreement and 89.9% of HS-Brexit autonomously at &alpha; = 0.10).
+* Conformal Risk Control mathematically bounds the Autonomous Overrule Rate below target thresholds ($lpha \in \{0.05, 0.10, 0.15, 0.20\}$) while preserving operational throughput (safely resolving 52.7% of MD-Agreement and 89.9% of HS-Brexit autonomously at $lpha = 0.10$).
 
 ---
 
@@ -185,9 +179,7 @@ Open [`IPM_v2_Replication_Notebook.ipynb`](IPM_v2_Replication_Notebook.ipynb) in
 @article{yu2026howmanyhumans,
   title={How Many Humans Does a Decision Need? Legitimacy-Aware Jury Allocation and Conformal Overrule Guarantees for Content Moderation},
   author={Yu, Shixiang and Ahmad, Muhammad Khubaib},
-  journal={Information Processing \& Management},
-  volume={--},
-  pages={--},
+  journal={Information Processing & Management},
   year={2026},
   publisher={Elsevier},
   note={Under Review}

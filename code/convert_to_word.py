@@ -15,7 +15,6 @@ MD_PATH = ROOT / "IPM_Manuscript.md"
 DOCX_PATH = ROOT / "IPM_Manuscript.docx"
 FIGS_DIR = ROOT / "outputs_v2" / "figures"
 
-# Load XSLT stylesheet for MathML to OMML
 XSL_PATH = r"C:\Program Files\Microsoft Office\root\Office16\MML2OMML.XSL"
 xslt = ET.parse(XSL_PATH)
 transform = ET.XSLT(xslt)
@@ -43,7 +42,6 @@ def clean_latex(s):
     s = s.replace(r"\min", r"\mathrm{min}")
     s = s.replace(r"\inf", r"\mathrm{inf}")
     s = s.replace(r"\sup", r"\mathrm{sup}")
-    s = s.replace(r"\binom", r"\choose")
     return s
 
 def latex_to_omml(latex, display=False):
@@ -52,14 +50,12 @@ def latex_to_omml(latex, display=False):
         mml = latex2mathml.converter.convert(cleaned, display="block" if display else "inline")
         mml_dom = ET.fromstring(mml)
         omml = transform(mml_dom).getroot()
-        # Convert lxml element to docx oxml element
         xml_str = ET.tostring(omml, encoding="utf-8").decode("utf-8")
         return parse_xml(xml_str)
     except Exception as e:
-        # Fallback to plain text run if math conversion fails
         return None
 
-def set_cell_margins(cell, top=100, bottom=100, left=150, right=150):
+def set_cell_margins(cell, top=80, bottom=80, left=120, right=120):
     tcPr = cell._tc.get_or_add_tcPr()
     tcMar = OxmlElement('w:tcMar')
     for m, val in [('w:top', top), ('w:bottom', bottom), ('w:left', left), ('w:right', right)]:
@@ -69,12 +65,11 @@ def set_cell_margins(cell, top=100, bottom=100, left=150, right=150):
         tcMar.append(node)
     tcPr.append(tcMar)
 
-def set_cell_shading(cell, color_hex="F2F2F2"):
+def set_cell_shading(cell, color_hex="EAECEE"):
     shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{color_hex}"/>')
     cell._tc.get_or_add_tcPr().append(shading)
 
 def set_table_borders(table):
-    # Professional academic 3-line booktabs borders: top thin, bottom thin, header bottom thin
     tblPr = table._tbl.tblPr
     borders = parse_xml(
         f'<w:tblBorders {nsdecls("w")}>\n'
@@ -88,15 +83,19 @@ def set_table_borders(table):
     )
     tblPr.append(borders)
 
-def add_formatted_paragraph(doc, text, style='Normal', space_after=6, space_before=0, line_spacing=1.15, align=WD_ALIGN_PARAGRAPH.LEFT):
-    p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(space_after)
-    p.paragraph_format.space_before = Pt(space_before)
-    p.paragraph_format.line_spacing = line_spacing
-    p.alignment = align
-    
-    # Tokenize inline math $...$ and formatted spans
-    # Regex splits by $...$
+def clean_xml_string(s):
+    # Remove any non-xml-compatible characters
+    return "".join(c for c in s if (0x20 <= ord(c) <= 0xD7FF) or c in '\t\n\r' or (0xE000 <= ord(c) <= 0xFFFD))
+
+def add_formatted_runs(p, text, font_size=11, bold_default=False, italic_default=False, font_name="Times New Roman", font_color=None):
+    text = text.strip()
+    if text.startswith('**') and text.endswith('**') and len(text) >= 4:
+        text = text[2:-2].strip()
+        bold_default = True
+    elif text.startswith('*') and text.endswith('*') and len(text) >= 2:
+        text = text[1:-1].strip()
+        italic_default = True
+        
     tokens = re.split(r'(\$.*?\$)', text)
     for token in tokens:
         if token.startswith('$') and token.endswith('$') and len(token) > 1:
@@ -105,29 +104,85 @@ def add_formatted_paragraph(doc, text, style='Normal', space_after=6, space_befo
             if omml is not None:
                 p._p.append(omml)
             else:
-                run = p.add_run(token)
-                run.font.name = "Cambria Math"
-                run.font.size = Pt(11)
-                run.italic = True
+                clean_sym = eq.replace(r'\le', '≤').replace(r'\ge', '≥').replace(r'\alpha', 'α').replace(r'\beta', 'β').replace(r'\mu', 'μ').replace(r'\mathcal{B}', 'B').replace(r'\Delta', 'Δ')
+                clean_sym = clean_xml_string(clean_sym)
+                try:
+                    r = p.add_run(clean_sym)
+                    r.font.name = "Cambria Math"
+                    r.font.size = Pt(font_size)
+                    r.italic = True
+                    r.bold = bold_default
+                    if font_color: r.font.color.rgb = font_color
+                except Exception as ex:
+                    print(f"Error on token: {token} -> {ex}")
         else:
-            # Process bold **text** and italic *text*
             sub_tokens = re.split(r'(\*\*.*?\*\*|\*.*?\*)', token)
             for st in sub_tokens:
                 if st.startswith('**') and st.endswith('**') and len(st) > 4:
-                    run = p.add_run(st[2:-2])
-                    run.bold = True
-                    run.font.name = "Times New Roman"
-                    run.font.size = Pt(11)
+                    inner = clean_xml_string(st[2:-2])
+                    r = p.add_run(inner)
+                    r.bold = True
+                    r.italic = italic_default
+                    r.font.name = font_name
+                    r.font.size = Pt(font_size)
+                    if font_color: r.font.color.rgb = font_color
                 elif st.startswith('*') and st.endswith('*') and len(st) > 2:
-                    run = p.add_run(st[1:-1])
-                    run.italic = True
-                    run.font.name = "Times New Roman"
-                    run.font.size = Pt(11)
-                else:
-                    run = p.add_run(st)
-                    run.font.name = "Times New Roman"
-                    run.font.size = Pt(11)
-    return p
+                    inner = clean_xml_string(st[1:-1])
+                    r = p.add_run(inner)
+                    r.bold = bold_default
+                    r.italic = True
+                    r.font.name = font_name
+                    r.font.size = Pt(font_size)
+                    if font_color: r.font.color.rgb = font_color
+                elif st:
+                    clean_st = clean_xml_string(st)
+                    r = p.add_run(clean_st)
+                    r.bold = bold_default
+                    r.italic = italic_default
+                    r.font.name = font_name
+                    r.font.size = Pt(font_size)
+                    if font_color: r.font.color.rgb = font_color
+
+def add_numbered_equation(doc, eq_text):
+    tag_match = re.search(r'\\tag\{(\d+)\}', eq_text)
+    eq_num = f"({tag_match.group(1)})" if tag_match else ""
+    clean_eq = re.sub(r'\\tag\{\d+\}', '', eq_text).strip()
+    
+    tbl = doc.add_table(rows=1, cols=2)
+    tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    tblPr = tbl._tbl.tblPr
+    borders = parse_xml(f'<w:tblBorders {nsdecls("w")}><w:top w:val="none"/><w:bottom w:val="none"/><w:left w:val="none"/><w:right w:val="none"/><w:insideH w:val="none"/><w:insideV w:val="none"/></w:tblBorders>')
+    tblPr.append(borders)
+    
+    cell_eq = tbl.cell(0, 0)
+    cell_num = tbl.cell(0, 1)
+    cell_eq.width = Inches(5.8)
+    cell_num.width = Inches(0.7)
+    
+    set_cell_margins(cell_eq, top=60, bottom=60, left=0, right=60)
+    set_cell_margins(cell_num, top=60, bottom=60, left=60, right=0)
+    
+    p_eq = cell_eq.paragraphs[0]
+    p_eq.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_eq.paragraph_format.space_before = Pt(4)
+    p_eq.paragraph_format.space_after = Pt(4)
+    
+    omml = latex_to_omml(clean_eq, display=True)
+    if omml is not None:
+        p_eq._p.append(omml)
+    else:
+        r = p_eq.add_run(clean_xml_string(clean_eq))
+        r.italic = True
+        r.font.name = "Cambria Math"
+        r.font.size = Pt(11)
+        
+    p_num = cell_num.paragraphs[0]
+    p_num.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p_num.paragraph_format.space_before = Pt(4)
+    p_num.paragraph_format.space_after = Pt(4)
+    r_num = p_num.add_run(eq_num)
+    r_num.font.name = "Times New Roman"
+    r_num.font.size = Pt(11)
 
 def build_word_document():
     print(f"Reading markdown from {MD_PATH}...")
@@ -136,7 +191,6 @@ def build_word_document():
     
     doc = Document()
     
-    # Page setup: Standard Letter, 1-inch margins
     sections = doc.sections
     for sec in sections:
         sec.top_margin = Inches(1.0)
@@ -150,64 +204,64 @@ def build_word_document():
     while i < n:
         line = lines[i].strip()
         
-        # Empty line
         if not line:
             i += 1
             continue
             
-        # Horizontal rule
         if line in ["---", "***", "___"]:
             i += 1
             continue
             
         # Title (# ...)
         if line.startswith("# ") and not line.startswith("## "):
-            title_text = line[2:].strip()
+            title_text = clean_xml_string(line[2:].strip())
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p.paragraph_format.space_before = Pt(12)
-            p.paragraph_format.space_after = Pt(12)
+            p.paragraph_format.space_before = Pt(18)
+            p.paragraph_format.space_after = Pt(14)
             run = p.add_run(title_text)
             run.bold = True
             run.font.name = "Times New Roman"
             run.font.size = Pt(16)
-            run.font.color.rgb = RGBColor(16, 44, 87) # Classic academic dark navy
+            run.font.color.rgb = RGBColor(16, 44, 87)
             i += 1
             continue
             
         # Heading 1 (## ...)
         if line.startswith("## "):
             h_text = line[3:].strip()
-            p = doc.add_paragraph()
+            p = doc.add_paragraph(style='Heading 1')
             p.paragraph_format.space_before = Pt(16)
             p.paragraph_format.space_after = Pt(6)
             p.paragraph_format.keep_with_next = True
-            run = p.add_run(h_text)
-            run.bold = True
-            run.font.name = "Times New Roman"
-            run.font.size = Pt(13)
-            run.font.color.rgb = RGBColor(16, 44, 87)
+            add_formatted_runs(p, h_text, font_size=13, bold_default=True, font_color=RGBColor(16, 44, 87))
             i += 1
             continue
             
         # Heading 2 (### ...)
         if line.startswith("### "):
             h_text = line[4:].strip()
-            p = doc.add_paragraph()
+            p = doc.add_paragraph(style='Heading 2')
             p.paragraph_format.space_before = Pt(12)
             p.paragraph_format.space_after = Pt(4)
             p.paragraph_format.keep_with_next = True
-            run = p.add_run(h_text)
-            run.bold = True
-            run.font.name = "Times New Roman"
-            run.font.size = Pt(12)
-            run.font.color.rgb = RGBColor(30, 30, 30)
+            add_formatted_runs(p, h_text, font_size=12, bold_default=True, font_color=RGBColor(30, 30, 30))
+            i += 1
+            continue
+            
+        # Heading 3 (#### ...)
+        if line.startswith("#### "):
+            h_text = line[5:].strip()
+            p = doc.add_paragraph(style='Heading 3')
+            p.paragraph_format.space_before = Pt(8)
+            p.paragraph_format.space_after = Pt(3)
+            p.paragraph_format.keep_with_next = True
+            add_formatted_runs(p, h_text, font_size=11, bold_default=True, italic_default=True, font_color=RGBColor(40, 40, 40))
             i += 1
             continue
             
         # Display Equation ($$...$$)
         if line.startswith("$$"):
-            # Check if one-line or multi-line
             if line.endswith("$$") and len(line) > 4:
                 eq = line[2:-2].strip()
                 i += 1
@@ -222,18 +276,7 @@ def build_word_document():
                     i += 1
                 eq = " ".join(eq_lines)
                 
-            p = doc.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p.paragraph_format.space_before = Pt(8)
-            p.paragraph_format.space_after = Pt(8)
-            omml = latex_to_omml(eq, display=True)
-            if omml is not None:
-                p._p.append(omml)
-            else:
-                run = p.add_run(eq)
-                run.italic = True
-                run.font.name = "Cambria Math"
-                run.font.size = Pt(11)
+            add_numbered_equation(doc, eq)
             continue
             
         # Markdown Table (| ... |)
@@ -243,7 +286,6 @@ def build_word_document():
                 tbl_lines.append(lines[i].strip())
                 i += 1
                 
-            # Filter out separator line (| :--- |)
             data_rows = []
             for tl in tbl_lines:
                 if re.match(r"^\|(\s*:?-+:?\s*\|)+$", tl):
@@ -263,48 +305,24 @@ def build_word_document():
                         val = row_data[c_idx] if c_idx < len(row_data) else ""
                         cell = tbl.cell(r_idx, c_idx)
                         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-                        set_cell_margins(cell, top=80, bottom=80, left=120, right=120)
+                        set_cell_margins(cell, top=70, bottom=70, left=100, right=100)
                         
                         p_cell = cell.paragraphs[0]
                         p_cell.paragraph_format.space_after = Pt(2)
                         p_cell.paragraph_format.space_before = Pt(2)
                         p_cell.paragraph_format.line_spacing = 1.05
                         
-                        # Shading and bold for header
                         if r_idx == 0:
                             set_cell_shading(cell, "EAECEE")
-                            run = p_cell.add_run(val.replace("**", ""))
-                            run.bold = True
-                            run.font.name = "Times New Roman"
-                            run.font.size = Pt(9.5)
                             p_cell.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            add_formatted_runs(p_cell, val, font_size=9.5, bold_default=True)
                         else:
-                            # Parse inline bold and math in cell
                             if re.search(r"^[\d\.\-\+\%]+$", val.replace("**", "").replace("$", "").strip()):
                                 p_cell.alignment = WD_ALIGN_PARAGRAPH.CENTER
                             else:
                                 p_cell.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                                
-                            tokens = re.split(r'(\$.*?\$|\*\*.*?\*\*)', val)
-                            for t in tokens:
-                                if t.startswith('$') and t.endswith('$') and len(t) > 1:
-                                    omml = latex_to_omml(t[1:-1], display=False)
-                                    if omml is not None:
-                                        p_cell._p.append(omml)
-                                    else:
-                                        r = p_cell.add_run(t)
-                                        r.font.name = "Cambria Math"
-                                        r.font.size = Pt(9.5)
-                                elif t.startswith('**') and t.endswith('**') and len(t) > 4:
-                                    r = p_cell.add_run(t[2:-2])
-                                    r.bold = True
-                                    r.font.name = "Times New Roman"
-                                    r.font.size = Pt(9.5)
-                                else:
-                                    r = p_cell.add_run(t)
-                                    r.font.name = "Times New Roman"
-                                    r.font.size = Pt(9.5)
-                                    
+                            add_formatted_runs(p_cell, val, font_size=9.5)
+                            
                 doc.add_paragraph().paragraph_format.space_after = Pt(4)
             continue
             
@@ -316,53 +334,27 @@ def build_word_document():
             p.paragraph_format.right_indent = Inches(0.4)
             p.paragraph_format.space_before = Pt(4)
             p.paragraph_format.space_after = Pt(4)
-            run = p.add_run(bq_text)
-            run.italic = True
-            run.font.name = "Times New Roman"
-            run.font.size = Pt(10.5)
+            add_formatted_runs(p, bq_text, font_size=10.5, italic_default=True)
             i += 1
             continue
             
         # Bullet list items (- ...)
         if line.startswith("- "):
             item_text = line[2:].strip()
-            # If in references, format with hanging indent
             p = doc.add_paragraph(style='List Bullet')
             p.paragraph_format.space_before = Pt(2)
             p.paragraph_format.space_after = Pt(3)
             p.paragraph_format.line_spacing = 1.15
-            
-            # Add formatted text
-            tokens = re.split(r'(\$.*?\$|\*\*.*?\*\*|\*.*?\*)', item_text)
-            for t in tokens:
-                if t.startswith('$') and t.endswith('$') and len(t) > 1:
-                    omml = latex_to_omml(t[1:-1], display=False)
-                    if omml is not None:
-                        p._p.append(omml)
-                    else:
-                        r = p.add_run(t)
-                        r.font.name = "Cambria Math"
-                        r.font.size = Pt(11)
-                elif t.startswith('**') and t.endswith('**') and len(t) > 4:
-                    r = p.add_run(t[2:-2])
-                    r.bold = True
-                    r.font.name = "Times New Roman"
-                    r.font.size = Pt(11)
-                elif t.startswith('*') and t.endswith('*') and len(t) > 2:
-                    r = p.add_run(t[1:-1])
-                    r.italic = True
-                    r.font.name = "Times New Roman"
-                    r.font.size = Pt(11)
-                else:
-                    r = p.add_run(t)
-                    r.font.name = "Times New Roman"
-                    r.font.size = Pt(11)
+            add_formatted_runs(p, item_text, font_size=11)
             i += 1
             continue
             
-        # Embed Figure 1 after RQ2 intro if referenced
+        # Embed Figure 1
         if "Figure 1 plots the complete Pareto frontiers" in line:
-            add_formatted_paragraph(doc, line)
+            p = doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(6)
+            p.paragraph_format.line_spacing = 1.15
+            add_formatted_runs(p, line)
             i += 1
             fig1_path = FIGS_DIR / "fig1_pareto_frontiers_four_benchmarks.png"
             if fig1_path.exists():
@@ -385,9 +377,12 @@ def build_word_document():
                 r_desc.font.size = Pt(10)
             continue
             
-        # Embed Figure 2 after Section 7.1 intro
+        # Embed Figure 2
         if "Table 5 and Figure 2 present the Autonomous Overrule Rate" in line:
-            add_formatted_paragraph(doc, line)
+            p = doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(6)
+            p.paragraph_format.line_spacing = 1.15
+            add_formatted_runs(p, line)
             i += 1
             fig2_path = FIGS_DIR / "fig2_demographic_disparity_mitigation.png"
             if fig2_path.exists():
@@ -411,7 +406,18 @@ def build_word_document():
             continue
 
         # Regular Paragraph
-        add_formatted_paragraph(doc, line)
+        p = doc.add_paragraph()
+        p.paragraph_format.space_after = Pt(6)
+        p.paragraph_format.line_spacing = 1.15
+        
+        # Theorem, Definition, Proposition styling
+        if any(line.startswith(prefix) for prefix in ["**Definition", "**Proposition", "**Theorem", "*Proof"]):
+            p.paragraph_format.left_indent = Inches(0.25)
+            p.paragraph_format.right_indent = Inches(0.25)
+            p.paragraph_format.space_before = Pt(4)
+            p.paragraph_format.space_after = Pt(4)
+            
+        add_formatted_runs(p, line)
         i += 1
 
     print(f"Saving compiled manuscript to {DOCX_PATH}...")
